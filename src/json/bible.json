@@ -1,0 +1,52 @@
+{
+  "verses": [
+    {
+      "book": "Genesis",
+      "chapter": 1,
+      "verse": 1,
+      "text": "In the beginning God created the heavens and the earth."
+    },
+    {
+      "book": "Genesis",
+      "chapter": 1,
+      "verse": 2,
+      "text": "Now the earth was formless and empty, darkness was over the surface of the deep, and the Spirit of God was hovering over the waters."
+    },
+    {
+      "book": "John",
+      "chapter": 3,
+      "verse": 16,
+      "text": "For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life."
+    },
+    {
+      "book": "Psalms",
+      "chapter": 23,
+      "verse": 1,
+      "text": "The Lord is my shepherd, I lack nothing."
+    },
+    {
+      "book": "Psalms",
+      "chapter": 23,
+      "verse": 2,
+      "text": "He makes me lie down in green pastures, he leads me beside quiet waters."
+    },
+    {
+      "book": "Romans",
+      "chapter": 8,
+      "verse": 28,
+      "text": "And we know that in all things God works for the good of those who love him, who have been called according to his purpose."
+    },
+    {
+      "book": "1 Corinthians",
+      "chapter": 13,
+      "verse": 4,
+      "text": "Love is patient, love is kind. It does not envy, it does not boast, it is not proud."
+    },
+    {
+      "book": "Matthew",
+      "chapter": 5,
+      "verse": 9,
+      "text": "Blessed are the peacemakers, for they will be called children of God."
+    }
+  ]
+}
