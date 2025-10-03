@@ -37,7 +37,7 @@ This project is for searching and looking up verses with synonyms and other feat
 ./bible_tool --search "Love" --case-sensitive
 
 # Search within specific book
-./bible_tool --search "peace" --book "Psalms"
+./bible_tool --search "peace" --book "Psalm"
 
 # Limit results to first 5 matches
 ./bible_tool --search "faith" --limit 5
@@ -67,7 +67,7 @@ This project is for searching and looking up verses with synonyms and other feat
 ./bible_tool --cross-references "John 3:16" --use-synonyms-xref
 
 # Adjust similarity threshold (0.0 to 1.0)
-./bible_tool -x "Psalms 23:1" --similarity 0.4
+./bible_tool -x "Psalm 23:1" --similarity 0.4
 
 # Limit results
 ./bible_tool -x "Romans 8:28" --use-synonyms-xref --similarity 0.25 -l 10
@@ -173,7 +173,7 @@ Searching for 'god' (with synonyms: almighty, creator, father, god, high, jehova
 
 Genesis 1:1 In the beginning God created the heaven and the earth.
 Genesis 1:2 And the earth was waste and void; and darkness was upon the face of the deep: and the spirit of God moved upon the face of the waters.
-Psalms 23:1 The LORD is my shepherd; I shall not want.
+Psalm 23:1 The LORD is my shepherd; I shall not want.
 
 Found 3 matching verses.
 ```
