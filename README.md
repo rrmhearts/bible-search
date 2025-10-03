@@ -54,6 +54,24 @@ This project is for searching and looking up verses with synonyms and other feat
 ./bible_tool --random
 ```
 
+### Cross-References
+```bash
+# Find verses similar to John 3:16 (default 30% similarity threshold)
+./bible_tool --cross-references "John 3:16"
+
+# Use synonyms for better matching
+./bible_tool --cross-references "John 3:16" --use-synonyms-xref
+
+# Adjust similarity threshold (0.0 to 1.0)
+./bible_tool -x "Psalms 23:1" --similarity 0.4
+
+# Limit results
+./bible_tool -x "Romans 8:28" --use-synonyms-xref --similarity 0.25 -l 10
+
+# Short form
+./bible_tool -x "Genesis 1:1"
+```
+
 ### Interactive Mode
 ```bash
 # Start interactive mode (original menu system)
@@ -73,6 +91,9 @@ This project is for searching and looking up verses with synonyms and other feat
 
 # Use custom synonyms file
 ./bible_tool --synonyms-file /path/to/my_synonyms.txt -s "god" --synonyms
+
+# Find cross-references with synonym matching
+./bible_tool -x "John 3:16" --use-synonyms-xref --similarity 0.35 -l 5
 
 # Disable colors for scripting
 ./bible_tool --search "hope" --no-color
@@ -148,6 +169,31 @@ Genesis 1:2 And the earth was waste and void; and darkness was upon the face of 
 Psalms 23:1 The LORD is my shepherd; I shall not want.
 
 Found 3 matching verses.
+```
+
+### Cross-References
+```bash
+$ ./bible_tool --cross-references "John 3:16" --use-synonyms-xref -l 5
+
+Loading Bible from bible.txt...
+✅ Bible loaded successfully (31102 verses).
+✅ Loaded 18 synonym groups from synonyms.txt
+Source Verse:
+John 3:16 For God so loved the world, that he gave his only begotten Son, that whosoever believeth on him should not perish, but have eternal life.
+
+Found 5 cross-reference(s) with similarity >= 30.0%:
+(Using synonym matching)
+
+45.2% - John 3:17 For God sent not the Son into the world to judge the world; but that the world should be saved through him.
+
+38.5% - 1 John 4:9 Herein was the love of God manifested in us, that God hath sent his only begotten Son into the world, that we might live through him.
+
+35.7% - Romans 5:8 But God commendeth his own love toward us, in that, while we were yet sinners, Christ died for us.
+
+32.1% - 1 John 4:10 Herein is love, not that we loved God, but that he loved us, and sent his Son to be the propitiation for our sins.
+
+30.4% - Ephesians 2:4 But God, being rich in mercy, for his great love wherewith he loved us.
+
 ```
 
 ### Reference Lookup
@@ -293,6 +339,9 @@ Genesis 1:2	And the earth was waste and void; and darkness was upon the face of 
 | `--create-synonyms` |  | Create default synonyms file and exit |
 | `--search` | `-s` | Search for text in verses |
 | `--reference` | `-r` | Look up verse by reference |
+| `--cross-references` | `-x` | Find cross-references for a verse |
+| `--similarity` |  | Similarity threshold for cross-references (0.0-1.0, default: 0.3) |
+| `--use-synonyms-xref` |  | Use synonyms when calculating cross-reference similarity |
 | `--random` |  | Get a random verse |
 | `--synonyms` |  | Include synonyms in search |
 | `--case-sensitive` | `-c` | Case sensitive search |
@@ -365,6 +414,17 @@ chmod +x search_bible.sh
 ./search_bible.sh "faith" 5
 ```
 
+### Cross-Reference Study
+
+```bash
+# Find related verses for study
+./bible_tool -x "Romans 8:28" --use-synonyms-xref --similarity 0.3 -l 10 > related_verses.txt
+
+# Compare cross-references with different thresholds
+./bible_tool -x "John 3:16" --similarity 0.5 -l 5  # Very similar only
+./bible_tool -x "John 3:16" --similarity 0.2 -l 20 # Broader matches
+```
+
 ## Troubleshooting
 
 ### Synonyms Not Working
@@ -420,6 +480,9 @@ crontab -e
 # Find all verses on a topic
 ./bible_tool -s "forgiveness" --synonyms > sermon_refs.txt
 
+# Find cross-references for key verses
+./bible_tool -x "Matthew 6:14" --use-synonyms-xref -l 10 > forgiveness_xrefs.txt
+
 # Find specific passages
 ./bible_tool -r "Matthew 5:1"
 ./bible_tool -r "Luke 15:11"
@@ -431,6 +494,8 @@ crontab -e
 ✅ **Simple text file format** - Easy to edit with any text editor  
 ✅ **Default synonym creation** - Quick start with `--create-synonyms`  
 ✅ **Custom synonym files** - Use `--synonyms-file` for different configurations  
+✅ **Cross-reference finder** - Find similar verses with adjustable similarity threshold  
+✅ **Synonym-based similarity** - Use `--use-synonyms-xref` for semantic matching  
 ✅ **Graceful fallback** - Works without synonym file (exact matching only)  
 ✅ **Comment support** - Document your synonym choices with `#` comments  
 ✅ **Case-insensitive** - Keywords and synonyms work regardless of case  

@@ -208,6 +208,22 @@ fn create_cli() -> Command {
             .long("interactive")
             .help("Start in interactive mode")
             .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("cross-references")
+            .short('x')
+            .long("cross-references")
+            .value_name("REFERENCE")
+            .help("Find cross-references for a verse (e.g., 'John 3:16')")
+            .conflicts_with_all(&["search", "random"]))
+        .arg(Arg::new("similarity")
+            .long("similarity")
+            .value_name("THRESHOLD")
+            .help("Similarity threshold for cross-references (0.0-1.0, default: 0.3)")
+            .value_parser(clap::value_parser!(f32))
+            .default_value("0.3"))
+        .arg(Arg::new("use-synonyms-xref")
+            .long("use-synonyms-xref")
+            .help("Use synonyms when calculating cross-reference similarity")
+            .action(clap::ArgAction::SetTrue))
 }
 
 // Main function to run the application logic.
@@ -269,7 +285,8 @@ fn main() {
 
     // Check if interactive mode is requested or no arguments provided
     if matches.get_flag("interactive") || 
-       (!matches.contains_id("search") && !matches.contains_id("reference") && !matches.get_flag("random")) {
+       (!matches.contains_id("search") && !matches.contains_id("reference") && 
+        !matches.get_flag("random") && !matches.contains_id("cross-references")) {
         interactive_mode(&bible, &synonym_mapper);
         return;
     }
@@ -286,6 +303,12 @@ fn main() {
         search_bible_cli(&bible, &synonym_mapper, query, use_synonyms, case_sensitive, book_filter, limit, use_color);
     } else if let Some(reference) = matches.get_one::<String>("reference") {
         lookup_verse_cli(&bible, reference);
+    } else if let Some(reference) = matches.get_one::<String>("cross-references") {
+        let similarity_threshold = *matches.get_one::<f32>("similarity").unwrap();
+        let use_synonyms = matches.get_flag("use-synonyms-xref");
+        let limit = matches.get_one::<usize>("limit").copied();
+        
+        find_cross_references(&bible, &synonym_mapper, reference, similarity_threshold, use_synonyms, limit, use_color);
     }
 }
 
@@ -520,6 +543,178 @@ fn get_random_verse(bible: &[Verse]) {
     
     let verse = &bible[index];
     println!("{}", verse);
+}
+
+// Cross-reference finder - find similar verses
+fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, reference: &str, similarity_threshold: f32, use_synonyms: bool, limit: Option<usize>, use_color: bool) {
+    lazy_static! {
+        static ref LOOKUP_RE: Regex = Regex::new(r"^(?P<book>.+?)\s(?P<chapter>\d+):(?P<verse>\d+)$").unwrap();
+    }
+
+    // Parse the reference
+    let (book, chapter, verse_num) = if let Some(caps) = LOOKUP_RE.captures(reference.trim()) {
+        let book = caps["book"].to_string();
+        let chapter: u32 = caps["chapter"].parse().unwrap();
+        let verse: u32 = caps["verse"].parse().unwrap();
+        (book, chapter, verse)
+    } else {
+        println!("{}", "Invalid reference format. Please use 'Book Chapter:Verse'.".red());
+        return;
+    };
+
+    // Find the source verse
+    let source_verse = bible.iter().find(|v| {
+        v.book.eq_ignore_ascii_case(&book) && v.chapter == chapter && v.verse == verse_num
+    });
+
+    let source_verse = match source_verse {
+        Some(v) => v,
+        None => {
+            println!("{}", "Source verse not found.".red());
+            return;
+        }
+    };
+
+    // Display source verse
+    if use_color {
+        println!("{}", "Source Verse:".bright_green().bold());
+    } else {
+        println!("Source Verse:");
+    }
+    println!("{}\n", source_verse);
+
+    // Extract words from source verse
+    let source_words = extract_words(&source_verse.text, synonym_mapper, use_synonyms);
+    
+    if source_words.is_empty() {
+        println!("{}", "No significant words found in source verse.".yellow());
+        return;
+    }
+
+    // Calculate similarity for all other verses
+    let mut similarities: Vec<(f32, &Verse)> = bible.iter()
+        .filter(|v| {
+            // Exclude the source verse itself
+            !(v.book.eq_ignore_ascii_case(&source_verse.book) 
+              && v.chapter == source_verse.chapter 
+              && v.verse == source_verse.verse)
+        })
+        .map(|v| {
+            let target_words = extract_words(&v.text, synonym_mapper, use_synonyms);
+            let similarity = calculate_similarity(&source_words, &target_words);
+            (similarity, v)
+        })
+        .filter(|(sim, _)| *sim >= similarity_threshold)
+        .collect();
+
+    // Sort by similarity (highest first)
+    similarities.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+
+    // Apply limit if specified
+    if let Some(limit) = limit {
+        similarities.truncate(limit);
+    }
+
+    if similarities.is_empty() {
+        if use_color {
+            println!("{}", format!("No cross-references found with similarity >= {:.1}%", similarity_threshold * 100.0).red());
+        } else {
+            println!("No cross-references found with similarity >= {:.1}%", similarity_threshold * 100.0);
+        }
+        println!("Try lowering the --similarity threshold (default: 0.3)");
+        return;
+    }
+
+    // Display results
+    if use_color {
+        println!("{}", format!("Found {} cross-reference(s) with similarity >= {:.1}%:", 
+            similarities.len(), similarity_threshold * 100.0).green().bold());
+    } else {
+        println!("Found {} cross-reference(s) with similarity >= {:.1}%:", 
+            similarities.len(), similarity_threshold * 100.0);
+    }
+    
+    if use_synonyms {
+        println!("{}", "(Using synonym matching)".bright_black());
+    }
+    println!();
+
+    for (similarity, verse) in similarities {
+        let percentage = if use_color {
+            format!("{:.1}%", similarity * 100.0).yellow().bold().to_string()
+        } else {
+            format!("{:.1}%", similarity * 100.0)
+        };
+
+        println!("{} - {} {}:{} {}", 
+            percentage,
+            verse.book.cyan(),
+            verse.chapter.to_string().cyan(),
+            verse.verse.to_string().cyan(),
+            verse.text
+        );
+        println!();
+    }
+}
+
+// Extract significant words from text, optionally expanding with synonyms
+fn extract_words(text: &str, synonym_mapper: &SynonymMapper, use_synonyms: bool) -> Vec<String> {
+    // Common words to exclude (stop words)
+    let stop_words: std::collections::HashSet<&str> = [
+        "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from",
+        "has", "he", "in", "is", "it", "its", "of", "on", "that", "the", "to",
+        "was", "will", "with", "shall", "unto", "thee", "thou", "thy", "ye",
+        "hath", "his", "her", "him", "them", "they", "their", "all", "not",
+        "which", "there", "this", "these", "those", "when", "who", "what",
+        "into", "upon", "out", "up", "have", "had", "do", "did", "done",
+        "said", "came", "went", "been", "were", "being"
+    ].iter().cloned().collect();
+
+    let words: Vec<String> = text
+        .to_lowercase()
+        .split_whitespace()
+        .map(|w| w.trim_matches(|c: char| !c.is_alphabetic()))
+        .filter(|w| !w.is_empty() && w.len() > 2 && !stop_words.contains(w))
+        .map(|w| w.to_string())
+        .collect();
+
+    if use_synonyms {
+        let mut expanded_words = Vec::new();
+        for word in words {
+            if let Some(synonyms) = synonym_mapper.synonyms.get(&word) {
+                expanded_words.extend(synonyms.clone());
+            } else {
+                expanded_words.push(word);
+            }
+        }
+        expanded_words.sort();
+        expanded_words.dedup();
+        expanded_words
+    } else {
+        let mut unique_words = words;
+        unique_words.sort();
+        unique_words.dedup();
+        unique_words
+    }
+}
+
+// Calculate Jaccard similarity between two word sets
+fn calculate_similarity(words1: &[String], words2: &[String]) -> f32 {
+    if words1.is_empty() || words2.is_empty() {
+        return 0.0;
+    }
+
+    let set1: std::collections::HashSet<_> = words1.iter().collect();
+    let set2: std::collections::HashSet<_> = words2.iter().collect();
+
+    let intersection = set1.intersection(&set2).count();
+    let union = set1.union(&set2).count();
+
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f32 / union as f32
+    }
 }
 
 #[cfg(test)]
