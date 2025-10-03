@@ -35,53 +35,86 @@ struct SynonymMapper {
 
 impl SynonymMapper {
     fn new() -> Self {
-        let mut synonyms = HashMap::new();
+        SynonymMapper {
+            synonyms: HashMap::new(),
+        }
+    }
+    
+    fn load_from_file(filename: &str) -> io::Result<Self> {
+        let mut mapper = Self::new();
         
-        // Add common biblical synonyms
-        synonyms.insert("love".to_string(), vec![
-            "love".to_string(), "loved".to_string(), "loveth".to_string(), 
-            "beloved".to_string(), "charity".to_string(), "affection".to_string()
-        ]);
-        synonyms.insert("god".to_string(), vec![
-            "god".to_string(), "lord".to_string(), "almighty".to_string(), 
-            "creator".to_string(), "father".to_string(), "jehovah".to_string(),
-            "yahweh".to_string(), "most".to_string()
-        ]);
-        synonyms.insert("jesus".to_string(), vec![
-            "jesus".to_string(), "christ".to_string(), "savior".to_string(), 
-            "saviour".to_string(), "redeemer".to_string(), "messiah".to_string(), 
-            "son".to_string()
-        ]);
-        synonyms.insert("peace".to_string(), vec![
-            "peace".to_string(), "tranquil".to_string(), "calm".to_string(), 
-            "serenity".to_string(), "rest".to_string(), "quiet".to_string()
-        ]);
-        synonyms.insert("joy".to_string(), vec![
-            "joy".to_string(), "happiness".to_string(), "gladness".to_string(), 
-            "delight".to_string(), "rejoice".to_string(), "joyful".to_string()
-        ]);
-        synonyms.insert("wisdom".to_string(), vec![
-            "wisdom".to_string(), "knowledge".to_string(), "understanding".to_string(), 
-            "insight".to_string(), "prudence".to_string(), "wise".to_string()
-        ]);
-        synonyms.insert("faith".to_string(), vec![
-            "faith".to_string(), "belief".to_string(), "trust".to_string(), 
-            "confidence".to_string(), "hope".to_string(), "believe".to_string()
-        ]);
-        synonyms.insert("fear".to_string(), vec![
-            "fear".to_string(), "afraid".to_string(), "terror".to_string(), 
-            "dread".to_string(), "reverence".to_string()
-        ]);
-        synonyms.insert("sin".to_string(), vec![
-            "sin".to_string(), "transgression".to_string(), "iniquity".to_string(), 
-            "wickedness".to_string(), "evil".to_string()
-        ]);
-        synonyms.insert("salvation".to_string(), vec![
-            "salvation".to_string(), "save".to_string(), "saved".to_string(), 
-            "deliverance".to_string(), "rescue".to_string()
-        ]);
+        let file = File::open(filename)?;
+        let reader = io::BufReader::new(file);
         
-        SynonymMapper { synonyms }
+        for line in reader.lines() {
+            let line = line?;
+            let line = line.trim();
+            
+            // Skip empty lines and comments
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            
+            // Parse format: key: synonym1, synonym2, synonym3
+            if let Some((key, values)) = line.split_once(':') {
+                let key = key.trim().to_lowercase();
+                let synonyms: Vec<String> = values
+                    .split(',')
+                    .map(|s| s.trim().to_lowercase())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                
+                if !synonyms.is_empty() {
+                    mapper.synonyms.insert(key, synonyms);
+                }
+            }
+        }
+        
+        Ok(mapper)
+    }
+    
+    fn create_default_file(filename: &str) -> io::Result<()> {
+        use std::fs;
+        
+        let default_content = r#"# Bible Search Tool - Synonym Configuration
+# Format: keyword: synonym1, synonym2, synonym3
+# Lines starting with # are comments and will be ignored
+# Keywords and synonyms are case-insensitive
+
+# Deity references
+god: god, lord, almighty, creator, father, jehovah, yahweh, most high
+jesus: jesus, christ, savior, saviour, redeemer, messiah, son, lamb
+
+# Spiritual concepts
+love: love, loved, loveth, beloved, charity, affection, devotion
+peace: peace, tranquil, calm, serenity, rest, quiet, still
+joy: joy, happiness, gladness, delight, rejoice, joyful, glad
+wisdom: wisdom, knowledge, understanding, insight, prudence, wise, discernment
+faith: faith, belief, trust, confidence, hope, believe, believing
+fear: fear, afraid, terror, dread, reverence, awe
+
+# Sin and salvation
+sin: sin, transgression, iniquity, wickedness, evil, trespass
+salvation: salvation, save, saved, deliverance, rescue, redeem, redeemed
+
+# Virtues
+righteousness: righteousness, righteous, just, justice, upright
+mercy: mercy, merciful, compassion, compassionate, grace, gracious
+truth: truth, true, truthful, verity, honest, honesty
+
+# Actions
+praise: praise, worship, glorify, exalt, magnify, honor
+prayer: prayer, pray, petition, supplication, intercession
+repent: repent, repentance, turn, return, humble
+
+# Additional concepts
+spirit: spirit, soul, heart, mind
+word: word, words, scripture, law, commandment, testimony
+kingdom: kingdom, reign, dominion, rule
+"#;
+        
+        fs::write(filename, default_content)?;
+        Ok(())
     }
     
     fn expand_query(&self, query: &str) -> Vec<String> {
@@ -102,12 +135,16 @@ impl SynonymMapper {
         expanded_terms.dedup();
         expanded_terms
     }
+    
+    fn get_synonym_count(&self) -> usize {
+        self.synonyms.len()
+    }
 }
 
 // Create command line interface
 fn create_cli() -> Command {
     Command::new("bible_tool")
-        .version("2.0.0")
+        .version("2.0.1")
         .author("Your Name")
         .about("Enhanced Bible search tool with synonym support")
         .arg(Arg::new("file")
@@ -115,7 +152,16 @@ fn create_cli() -> Command {
             .long("file")
             .value_name("FILE")
             .help("Path to Bible text file")
-            .default_value("bible.txt"))
+            .default_value("bibles/bible.txt"))
+        .arg(Arg::new("synonyms-file")
+            .long("synonyms-file")
+            .value_name("FILE")
+            .help("Path to synonyms configuration file")
+            .default_value("synonyms.txt"))
+        .arg(Arg::new("create-synonyms")
+            .long("create-synonyms")
+            .help("Create default synonyms file and exit")
+            .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("search")
             .short('s')
             .long("search")
@@ -162,11 +208,44 @@ fn create_cli() -> Command {
             .long("interactive")
             .help("Start in interactive mode")
             .action(clap::ArgAction::SetTrue))
+        .arg(Arg::new("cross-references")
+            .short('x')
+            .long("cross-references")
+            .value_name("REFERENCE")
+            .help("Find cross-references for a verse (e.g., 'John 3:16')")
+            .conflicts_with_all(&["search", "random"]))
+        .arg(Arg::new("similarity")
+            .long("similarity")
+            .value_name("THRESHOLD")
+            .help("Similarity threshold for cross-references (0.0-1.0, default: 0.3)")
+            .value_parser(clap::value_parser!(f32))
+            .default_value("0.3"))
+        .arg(Arg::new("use-synonyms-xref")
+            .long("use-synonyms-xref")
+            .help("Use synonyms when calculating cross-reference similarity")
+            .action(clap::ArgAction::SetTrue))
 }
 
 // Main function to run the application logic.
 fn main() {
     let matches = create_cli().get_matches();
+    
+    let synonyms_file = matches.get_one::<String>("synonyms-file").unwrap();
+    
+    // Handle --create-synonyms flag
+    if matches.get_flag("create-synonyms") {
+        match SynonymMapper::create_default_file(synonyms_file) {
+            Ok(_) => {
+                println!("{} Created default synonyms file: {}", "✅".green(), synonyms_file);
+                println!("You can now edit this file to customize your synonyms.");
+                return;
+            }
+            Err(e) => {
+                eprintln!("{} Error creating synonyms file: {}", "🔥".red(), e);
+                return;
+            }
+        }
+    }
     
     let bible_file = matches.get_one::<String>("file").unwrap();
     let use_color = !matches.get_flag("no-color");
@@ -186,11 +265,28 @@ fn main() {
         }
     };
     
-    let synonym_mapper = SynonymMapper::new();
+    // Load synonyms from file
+    let synonym_mapper = match SynonymMapper::load_from_file(synonyms_file) {
+        Ok(mapper) => {
+            if mapper.get_synonym_count() > 0 {
+                println!("✅ Loaded {} synonym groups from {}", mapper.get_synonym_count(), synonyms_file);
+            } else {
+                println!("⚠️  No synonyms loaded from {}. Using exact word matching only.", synonyms_file);
+            }
+            mapper
+        }
+        Err(e) => {
+            println!("⚠️  Could not load synonyms file ({}): {}", synonyms_file, e);
+            println!("   Using exact word matching only.");
+            println!("   Run with --create-synonyms to create a default synonyms file.");
+            SynonymMapper::new()
+        }
+    };
 
     // Check if interactive mode is requested or no arguments provided
     if matches.get_flag("interactive") || 
-       (!matches.contains_id("search") && !matches.contains_id("reference") && !matches.get_flag("random")) {
+       (!matches.contains_id("search") && !matches.contains_id("reference") && 
+        !matches.get_flag("random") && !matches.contains_id("cross-references")) {
         interactive_mode(&bible, &synonym_mapper);
         return;
     }
@@ -207,6 +303,12 @@ fn main() {
         search_bible_cli(&bible, &synonym_mapper, query, use_synonyms, case_sensitive, book_filter, limit, use_color);
     } else if let Some(reference) = matches.get_one::<String>("reference") {
         lookup_verse_cli(&bible, reference);
+    } else if let Some(reference) = matches.get_one::<String>("cross-references") {
+        let similarity_threshold = *matches.get_one::<f32>("similarity").unwrap();
+        let use_synonyms = matches.get_flag("use-synonyms-xref");
+        let limit = matches.get_one::<usize>("limit").copied();
+        
+        find_cross_references(&bible, &synonym_mapper, reference, similarity_threshold, use_synonyms, limit, use_color);
     }
 }
 
@@ -318,8 +420,10 @@ fn search_bible_cli(bible: &[Verse], synonym_mapper: &SynonymMapper, query: &str
         query.split_whitespace().map(|s| s.to_string()).collect()
     };
 
-    if use_synonyms {
+    if use_synonyms && search_terms.len() > query.split_whitespace().count() {
         println!("Searching for '{}' (with synonyms: {})...", query, search_terms.join(", "));
+    } else if use_synonyms {
+        println!("Searching for '{}' (no synonyms defined for these terms)...", query);
     } else {
         println!("Searching for '{}'...", query);
     }
@@ -441,13 +545,188 @@ fn get_random_verse(bible: &[Verse]) {
     println!("{}", verse);
 }
 
+// Cross-reference finder - find similar verses
+fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, reference: &str, similarity_threshold: f32, use_synonyms: bool, limit: Option<usize>, use_color: bool) {
+    lazy_static! {
+        static ref LOOKUP_RE: Regex = Regex::new(r"^(?P<book>.+?)\s(?P<chapter>\d+):(?P<verse>\d+)$").unwrap();
+    }
+
+    // Parse the reference
+    let (book, chapter, verse_num) = if let Some(caps) = LOOKUP_RE.captures(reference.trim()) {
+        let book = caps["book"].to_string();
+        let chapter: u32 = caps["chapter"].parse().unwrap();
+        let verse: u32 = caps["verse"].parse().unwrap();
+        (book, chapter, verse)
+    } else {
+        println!("{}", "Invalid reference format. Please use 'Book Chapter:Verse'.".red());
+        return;
+    };
+
+    // Find the source verse
+    let source_verse = bible.iter().find(|v| {
+        v.book.eq_ignore_ascii_case(&book) && v.chapter == chapter && v.verse == verse_num
+    });
+
+    let source_verse = match source_verse {
+        Some(v) => v,
+        None => {
+            println!("{}", "Source verse not found.".red());
+            return;
+        }
+    };
+
+    // Display source verse
+    if use_color {
+        println!("{}", "Source Verse:".bright_green().bold());
+    } else {
+        println!("Source Verse:");
+    }
+    println!("{}\n", source_verse);
+
+    // Extract words from source verse
+    let source_words = extract_words(&source_verse.text, synonym_mapper, use_synonyms);
+    
+    if source_words.is_empty() {
+        println!("{}", "No significant words found in source verse.".yellow());
+        return;
+    }
+
+    // Calculate similarity for all other verses
+    let mut similarities: Vec<(f32, &Verse)> = bible.iter()
+        .filter(|v| {
+            // Exclude the source verse itself
+            !(v.book.eq_ignore_ascii_case(&source_verse.book) 
+              && v.chapter == source_verse.chapter 
+              && v.verse == source_verse.verse)
+        })
+        .map(|v| {
+            let target_words = extract_words(&v.text, synonym_mapper, use_synonyms);
+            let similarity = calculate_similarity(&source_words, &target_words);
+            (similarity, v)
+        })
+        .filter(|(sim, _)| *sim >= similarity_threshold)
+        .collect();
+
+    // Sort by similarity (highest first)
+    similarities.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+
+    // Apply limit if specified
+    if let Some(limit) = limit {
+        similarities.truncate(limit);
+    }
+
+    if similarities.is_empty() {
+        if use_color {
+            println!("{}", format!("No cross-references found with similarity >= {:.1}%", similarity_threshold * 100.0).red());
+        } else {
+            println!("No cross-references found with similarity >= {:.1}%", similarity_threshold * 100.0);
+        }
+        println!("Try lowering the --similarity threshold (default: 0.3)");
+        return;
+    }
+
+    // Display results
+    if use_color {
+        println!("{}", format!("Found {} cross-reference(s) with similarity >= {:.1}%:", 
+            similarities.len(), similarity_threshold * 100.0).green().bold());
+    } else {
+        println!("Found {} cross-reference(s) with similarity >= {:.1}%:", 
+            similarities.len(), similarity_threshold * 100.0);
+    }
+    
+    if use_synonyms {
+        println!("{}", "(Using synonym matching)".bright_black());
+    }
+    println!();
+
+    for (similarity, verse) in similarities {
+        let percentage = if use_color {
+            format!("{:.1}%", similarity * 100.0).yellow().bold().to_string()
+        } else {
+            format!("{:.1}%", similarity * 100.0)
+        };
+
+        println!("{} - {} {}:{} {}", 
+            percentage,
+            verse.book.cyan(),
+            verse.chapter.to_string().cyan(),
+            verse.verse.to_string().cyan(),
+            verse.text
+        );
+        println!();
+    }
+}
+
+// Extract significant words from text, optionally expanding with synonyms
+fn extract_words(text: &str, synonym_mapper: &SynonymMapper, use_synonyms: bool) -> Vec<String> {
+    // Common words to exclude (stop words)
+    let stop_words: std::collections::HashSet<&str> = [
+        "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from",
+        "has", "he", "in", "is", "it", "its", "of", "on", "that", "the", "to",
+        "was", "will", "with", "shall", "unto", "thee", "thou", "thy", "ye",
+        "hath", "his", "her", "him", "them", "they", "their", "all", "not",
+        "which", "there", "this", "these", "those", "when", "who", "what",
+        "into", "upon", "out", "up", "have", "had", "do", "did", "done",
+        "said", "came", "went", "been", "were", "being"
+    ].iter().cloned().collect();
+
+    let words: Vec<String> = text
+        .to_lowercase()
+        .split_whitespace()
+        .map(|w| w.trim_matches(|c: char| !c.is_alphabetic()))
+        .filter(|w| !w.is_empty() && w.len() > 2 && !stop_words.contains(w))
+        .map(|w| w.to_string())
+        .collect();
+
+    if use_synonyms {
+        let mut expanded_words = Vec::new();
+        for word in words {
+            if let Some(synonyms) = synonym_mapper.synonyms.get(&word) {
+                expanded_words.extend(synonyms.clone());
+            } else {
+                expanded_words.push(word);
+            }
+        }
+        expanded_words.sort();
+        expanded_words.dedup();
+        expanded_words
+    } else {
+        let mut unique_words = words;
+        unique_words.sort();
+        unique_words.dedup();
+        unique_words
+    }
+}
+
+// Calculate Jaccard similarity between two word sets
+fn calculate_similarity(words1: &[String], words2: &[String]) -> f32 {
+    if words1.is_empty() || words2.is_empty() {
+        return 0.0;
+    }
+
+    let set1: std::collections::HashSet<_> = words1.iter().collect();
+    let set2: std::collections::HashSet<_> = words2.iter().collect();
+
+    let intersection = set1.intersection(&set2).count();
+    let union = set1.union(&set2).count();
+
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f32 / union as f32
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     
     #[test]
     fn test_synonym_expansion() {
-        let mapper = SynonymMapper::new();
+        let mut mapper = SynonymMapper::new();
+        mapper.synonyms.insert("god".to_string(), vec!["god".to_string(), "lord".to_string()]);
+        mapper.synonyms.insert("love".to_string(), vec!["love".to_string(), "beloved".to_string()]);
+        
         let expanded = mapper.expand_query("god love");
         
         assert!(expanded.contains(&"god".to_string()));
