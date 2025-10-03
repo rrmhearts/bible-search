@@ -144,7 +144,7 @@ kingdom: kingdom, reign, dominion, rule
 // Create command line interface
 fn create_cli() -> Command {
     Command::new("bible_tool")
-        .version("2.0.0")
+        .version("2.0.1")
         .author("Your Name")
         .about("Enhanced Bible search tool with synonym support")
         .arg(Arg::new("file")
