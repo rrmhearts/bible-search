@@ -97,6 +97,9 @@ This project is for searching and looking up verses with synonyms and other feat
 
 # Disable colors for scripting
 ./bible_tool --search "hope" --no-color
+
+# Use supported translation (KJV, ASV, ERV)
+./bible_tool --search "believeth" --kjv
 ```
 
 ## Synonym File Management
@@ -335,6 +338,9 @@ Genesis 1:2	And the earth was waste and void; and darkness was upon the face of 
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--file` | `-f` | Path to Bible text file (default: bible.txt) |
+| `--kjv` | | Use KJV. Equivalent to `--file bibles/kjv.txt`. |
+| `--asv` | | Use ASV. Equivalent to `--file bibles/asv.txt`. |
+| `--erv` | | Use ERV. Equivalent to `--file bibles/erv.txt`. |
 | `--synonyms-file` |  | Path to synonyms configuration file (default: synonyms.txt) |
 | `--create-synonyms` |  | Create default synonyms file and exit |
 | `--search` | `-s` | Search for text in verses |
