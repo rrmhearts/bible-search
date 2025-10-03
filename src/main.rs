@@ -153,6 +153,21 @@ fn create_cli() -> Command {
             .value_name("FILE")
             .help("Path to Bible text file")
             .default_value("bibles/bible.txt"))
+        .arg(Arg::new("kjv")
+            .long("kjv")
+            .help("Use the King James Version (bibles/kjv.txt)")
+            .action(clap::ArgAction::SetTrue)
+            .conflicts_with_all(&["file", "erv", "asv"]))
+        .arg(Arg::new("erv")
+            .long("erv")
+            .help("Use the English Revised Version (bibles/erv.txt)")
+            .action(clap::ArgAction::SetTrue)
+            .conflicts_with_all(&["file", "kjv", "asv"]))
+        .arg(Arg::new("asv")
+            .long("asv")
+            .help("Use the American Standard Version (bibles/asv.txt)")
+            .action(clap::ArgAction::SetTrue)
+            .conflicts_with_all(&["file", "kjv", "erv"]))
         .arg(Arg::new("synonyms-file")
             .long("synonyms-file")
             .value_name("FILE")
@@ -247,7 +262,18 @@ fn main() {
         }
     }
     
-    let bible_file = matches.get_one::<String>("file").unwrap();
+    // Shortened Bible selection text to version name --kjv or --erv
+    let bible_file = if matches.get_flag("kjv") {
+        "bibles/kjv.txt"
+    } else if matches.get_flag("erv") {
+        "bibles/erv.txt"
+    } else if matches.get_flag("asv") {
+        "bibles/asv.txt"
+    } else {
+        // Fallback to the --file argument if no version flag is used
+        matches.get_one::<String>("file").unwrap()
+    };
+
     let use_color = !matches.get_flag("no-color");
     
     println!("Loading Bible from {}...", bible_file);
