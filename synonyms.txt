@@ -1,0 +1,35 @@
+# Bible Search Tool - Synonym Configuration
+# Format: keyword: synonym1, synonym2, synonym3
+# Lines starting with # are comments and will be ignored
+# Keywords and synonyms are case-insensitive
+
+# Deity references
+god: god, lord, almighty, creator, father, jehovah, yahweh, most high
+jesus: jesus, christ, savior, saviour, redeemer, messiah, son, lamb
+
+# Spiritual concepts
+love: love, loved, loveth, beloved, charity, affection, devotion
+peace: peace, tranquil, calm, serenity, rest, quiet, still
+joy: joy, happiness, gladness, delight, rejoice, joyful, glad
+wisdom: wisdom, knowledge, understanding, insight, prudence, wise, discernment
+faith: faith, belief, trust, confidence, hope, believe, believing
+fear: fear, afraid, terror, dread, reverence, awe
+
+# Sin and salvation
+sin: sin, transgression, iniquity, wickedness, evil, trespass
+salvation: salvation, save, saved, deliverance, rescue, redeem, redeemed
+
+# Virtues
+righteousness: righteousness, righteous, just, justice, upright
+mercy: mercy, merciful, compassion, compassionate, grace, gracious
+truth: truth, true, truthful, verity, honest, honesty
+
+# Actions
+praise: praise, worship, glorify, exalt, magnify, honor
+prayer: prayer, pray, petition, supplication, intercession
+repent: repent, repentance, turn, return, humble
+
+# Additional concepts
+spirit: spirit, soul, heart, mind
+word: word, words, scripture, law, commandment, testimony
+kingdom: kingdom, reign, dominion, rule

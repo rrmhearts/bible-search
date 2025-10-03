@@ -35,53 +35,86 @@ struct SynonymMapper {
 
 impl SynonymMapper {
     fn new() -> Self {
-        let mut synonyms = HashMap::new();
+        SynonymMapper {
+            synonyms: HashMap::new(),
+        }
+    }
+    
+    fn load_from_file(filename: &str) -> io::Result<Self> {
+        let mut mapper = Self::new();
         
-        // Add common biblical synonyms
-        synonyms.insert("love".to_string(), vec![
-            "love".to_string(), "loved".to_string(), "loveth".to_string(), 
-            "beloved".to_string(), "charity".to_string(), "affection".to_string()
-        ]);
-        synonyms.insert("god".to_string(), vec![
-            "god".to_string(), "lord".to_string(), "almighty".to_string(), 
-            "creator".to_string(), "father".to_string(), "jehovah".to_string(),
-            "yahweh".to_string(), "most".to_string()
-        ]);
-        synonyms.insert("jesus".to_string(), vec![
-            "jesus".to_string(), "christ".to_string(), "savior".to_string(), 
-            "saviour".to_string(), "redeemer".to_string(), "messiah".to_string(), 
-            "son".to_string()
-        ]);
-        synonyms.insert("peace".to_string(), vec![
-            "peace".to_string(), "tranquil".to_string(), "calm".to_string(), 
-            "serenity".to_string(), "rest".to_string(), "quiet".to_string()
-        ]);
-        synonyms.insert("joy".to_string(), vec![
-            "joy".to_string(), "happiness".to_string(), "gladness".to_string(), 
-            "delight".to_string(), "rejoice".to_string(), "joyful".to_string()
-        ]);
-        synonyms.insert("wisdom".to_string(), vec![
-            "wisdom".to_string(), "knowledge".to_string(), "understanding".to_string(), 
-            "insight".to_string(), "prudence".to_string(), "wise".to_string()
-        ]);
-        synonyms.insert("faith".to_string(), vec![
-            "faith".to_string(), "belief".to_string(), "trust".to_string(), 
-            "confidence".to_string(), "hope".to_string(), "believe".to_string()
-        ]);
-        synonyms.insert("fear".to_string(), vec![
-            "fear".to_string(), "afraid".to_string(), "terror".to_string(), 
-            "dread".to_string(), "reverence".to_string()
-        ]);
-        synonyms.insert("sin".to_string(), vec![
-            "sin".to_string(), "transgression".to_string(), "iniquity".to_string(), 
-            "wickedness".to_string(), "evil".to_string()
-        ]);
-        synonyms.insert("salvation".to_string(), vec![
-            "salvation".to_string(), "save".to_string(), "saved".to_string(), 
-            "deliverance".to_string(), "rescue".to_string()
-        ]);
+        let file = File::open(filename)?;
+        let reader = io::BufReader::new(file);
         
-        SynonymMapper { synonyms }
+        for line in reader.lines() {
+            let line = line?;
+            let line = line.trim();
+            
+            // Skip empty lines and comments
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            
+            // Parse format: key: synonym1, synonym2, synonym3
+            if let Some((key, values)) = line.split_once(':') {
+                let key = key.trim().to_lowercase();
+                let synonyms: Vec<String> = values
+                    .split(',')
+                    .map(|s| s.trim().to_lowercase())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                
+                if !synonyms.is_empty() {
+                    mapper.synonyms.insert(key, synonyms);
+                }
+            }
+        }
+        
+        Ok(mapper)
+    }
+    
+    fn create_default_file(filename: &str) -> io::Result<()> {
+        use std::fs;
+        
+        let default_content = r#"# Bible Search Tool - Synonym Configuration
+# Format: keyword: synonym1, synonym2, synonym3
+# Lines starting with # are comments and will be ignored
+# Keywords and synonyms are case-insensitive
+
+# Deity references
+god: god, lord, almighty, creator, father, jehovah, yahweh, most high
+jesus: jesus, christ, savior, saviour, redeemer, messiah, son, lamb
+
+# Spiritual concepts
+love: love, loved, loveth, beloved, charity, affection, devotion
+peace: peace, tranquil, calm, serenity, rest, quiet, still
+joy: joy, happiness, gladness, delight, rejoice, joyful, glad
+wisdom: wisdom, knowledge, understanding, insight, prudence, wise, discernment
+faith: faith, belief, trust, confidence, hope, believe, believing
+fear: fear, afraid, terror, dread, reverence, awe
+
+# Sin and salvation
+sin: sin, transgression, iniquity, wickedness, evil, trespass
+salvation: salvation, save, saved, deliverance, rescue, redeem, redeemed
+
+# Virtues
+righteousness: righteousness, righteous, just, justice, upright
+mercy: mercy, merciful, compassion, compassionate, grace, gracious
+truth: truth, true, truthful, verity, honest, honesty
+
+# Actions
+praise: praise, worship, glorify, exalt, magnify, honor
+prayer: prayer, pray, petition, supplication, intercession
+repent: repent, repentance, turn, return, humble
+
+# Additional concepts
+spirit: spirit, soul, heart, mind
+word: word, words, scripture, law, commandment, testimony
+kingdom: kingdom, reign, dominion, rule
+"#;
+        
+        fs::write(filename, default_content)?;
+        Ok(())
     }
     
     fn expand_query(&self, query: &str) -> Vec<String> {
@@ -102,6 +135,10 @@ impl SynonymMapper {
         expanded_terms.dedup();
         expanded_terms
     }
+    
+    fn get_synonym_count(&self) -> usize {
+        self.synonyms.len()
+    }
 }
 
 // Create command line interface
@@ -116,6 +153,15 @@ fn create_cli() -> Command {
             .value_name("FILE")
             .help("Path to Bible text file")
             .default_value("bible.txt"))
+        .arg(Arg::new("synonyms-file")
+            .long("synonyms-file")
+            .value_name("FILE")
+            .help("Path to synonyms configuration file")
+            .default_value("synonyms.txt"))
+        .arg(Arg::new("create-synonyms")
+            .long("create-synonyms")
+            .help("Create default synonyms file and exit")
+            .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("search")
             .short('s')
             .long("search")
@@ -168,6 +214,23 @@ fn create_cli() -> Command {
 fn main() {
     let matches = create_cli().get_matches();
     
+    let synonyms_file = matches.get_one::<String>("synonyms-file").unwrap();
+    
+    // Handle --create-synonyms flag
+    if matches.get_flag("create-synonyms") {
+        match SynonymMapper::create_default_file(synonyms_file) {
+            Ok(_) => {
+                println!("{} Created default synonyms file: {}", "✅".green(), synonyms_file);
+                println!("You can now edit this file to customize your synonyms.");
+                return;
+            }
+            Err(e) => {
+                eprintln!("{} Error creating synonyms file: {}", "🔥".red(), e);
+                return;
+            }
+        }
+    }
+    
     let bible_file = matches.get_one::<String>("file").unwrap();
     let use_color = !matches.get_flag("no-color");
     
@@ -186,7 +249,23 @@ fn main() {
         }
     };
     
-    let synonym_mapper = SynonymMapper::new();
+    // Load synonyms from file
+    let synonym_mapper = match SynonymMapper::load_from_file(synonyms_file) {
+        Ok(mapper) => {
+            if mapper.get_synonym_count() > 0 {
+                println!("✅ Loaded {} synonym groups from {}", mapper.get_synonym_count(), synonyms_file);
+            } else {
+                println!("⚠️  No synonyms loaded from {}. Using exact word matching only.", synonyms_file);
+            }
+            mapper
+        }
+        Err(e) => {
+            println!("⚠️  Could not load synonyms file ({}): {}", synonyms_file, e);
+            println!("   Using exact word matching only.");
+            println!("   Run with --create-synonyms to create a default synonyms file.");
+            SynonymMapper::new()
+        }
+    };
 
     // Check if interactive mode is requested or no arguments provided
     if matches.get_flag("interactive") || 
@@ -318,8 +397,10 @@ fn search_bible_cli(bible: &[Verse], synonym_mapper: &SynonymMapper, query: &str
         query.split_whitespace().map(|s| s.to_string()).collect()
     };
 
-    if use_synonyms {
+    if use_synonyms && search_terms.len() > query.split_whitespace().count() {
         println!("Searching for '{}' (with synonyms: {})...", query, search_terms.join(", "));
+    } else if use_synonyms {
+        println!("Searching for '{}' (no synonyms defined for these terms)...", query);
     } else {
         println!("Searching for '{}'...", query);
     }
@@ -447,7 +528,10 @@ mod tests {
     
     #[test]
     fn test_synonym_expansion() {
-        let mapper = SynonymMapper::new();
+        let mut mapper = SynonymMapper::new();
+        mapper.synonyms.insert("god".to_string(), vec!["god".to_string(), "lord".to_string()]);
+        mapper.synonyms.insert("love".to_string(), vec!["love".to_string(), "beloved".to_string()]);
+        
         let expanded = mapper.expand_query("god love");
         
         assert!(expanded.contains(&"god".to_string()));
