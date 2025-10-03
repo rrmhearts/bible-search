@@ -152,7 +152,7 @@ fn create_cli() -> Command {
             .long("file")
             .value_name("FILE")
             .help("Path to Bible text file")
-            .default_value("bible.txt"))
+            .default_value("bibles/bible.txt"))
         .arg(Arg::new("synonyms-file")
             .long("synonyms-file")
             .value_name("FILE")
