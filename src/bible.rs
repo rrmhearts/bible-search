@@ -1,5 +1,3 @@
-// bible.rs
-
 use std::fs::File;
 use std::io::{self, BufRead, Write};
 use regex::Regex;
@@ -29,6 +27,9 @@ impl std::fmt::Display for Verse {
     }
 }
 
+// Synonym mapper for enhanced search
+
+
 // Parses the bible.txt file and returns a Vector of Verse structs.
 pub fn load_bible(filename: &str) -> io::Result<Vec<Verse>> {
     lazy_static! {
@@ -39,6 +40,7 @@ pub fn load_bible(filename: &str) -> io::Result<Vec<Verse>> {
     let reader = io::BufReader::new(file);
     let mut bible = Vec::new();
 
+    // Skip the first two header lines.
     for line in reader.lines().skip(2) {
         let line = line?;
         if let Some(caps) = RE.captures(&line) {
@@ -54,13 +56,7 @@ pub fn load_bible(filename: &str) -> io::Result<Vec<Verse>> {
     Ok(bible)
 }
 
-// ... (move all other Bible-related functions here)
-// Such as: lookup_verse_cli, search_bible_cli, get_random_verse, find_cross_references, 
-// interactive_mode, print_menu, lookup_verse, search_bible_interactive, extract_words,
-// and calculate_similarity.
-// Make sure to add `pub` to functions that are called from main.rs.
-
-// Example of a moved function:
+// CLI version of verse lookup
 pub fn lookup_verse_cli(bible: &[Verse], reference: &str) {
     lazy_static! {
         static ref LOOKUP_RE: Regex = Regex::new(r"^(?P<book>.+?)\s(?P<chapter>\d+):(?P<verse>\d+)$").unwrap();
@@ -71,6 +67,7 @@ pub fn lookup_verse_cli(bible: &[Verse], reference: &str) {
         let chapter: u32 = caps["chapter"].parse().unwrap();
         let verse: u32 = caps["verse"].parse().unwrap();
 
+        // Find the verse in our loaded Bible data.
         let found_verse = bible.iter().find(|v| {
             v.book.eq_ignore_ascii_case(book) && v.chapter == chapter && v.verse == verse
         });
@@ -185,6 +182,7 @@ pub fn search_bible_cli(bible: &[Verse], synonym_mapper: &SynonymMapper, query: 
     let mut results = Vec::new();
 
     for verse in bible {
+        // Apply book filter if specified
         if let Some(book) = book_filter {
             if !verse.book.to_lowercase().contains(&book.to_lowercase()) {
                 continue;
@@ -197,6 +195,7 @@ pub fn search_bible_cli(bible: &[Verse], synonym_mapper: &SynonymMapper, query: 
             verse.text.to_lowercase()
         };
 
+        // Check if any search term matches
         let matches = search_terms.iter().any(|term| {
             if case_sensitive {
                 verse.text.contains(term)
@@ -209,6 +208,7 @@ pub fn search_bible_cli(bible: &[Verse], synonym_mapper: &SynonymMapper, query: 
             results.push(verse);
             results_found += 1;
             
+            // Apply limit if specified
             if let Some(limit) = limit {
                 if results_found >= limit {
                     break;
@@ -222,8 +222,10 @@ pub fn search_bible_cli(bible: &[Verse], synonym_mapper: &SynonymMapper, query: 
     } else {
         println!();
         for verse in results {
+            // Create highlighted version of the text
             let mut highlighted_text = verse.text.clone();
             
+            // Highlight matching terms
             if use_color {
                 for term in &search_terms {
                     if case_sensitive {
@@ -231,6 +233,7 @@ pub fn search_bible_cli(bible: &[Verse], synonym_mapper: &SynonymMapper, query: 
                             highlighted_text = highlighted_text.replace(term, &term.black().on_yellow().to_string());
                         }
                     } else {
+                        // Case-insensitive highlighting is more complex
                         let lower_text = verse.text.to_lowercase();
                         let lower_term = term.to_lowercase();
                         if let Some(pos) = lower_text.find(&lower_term) {
@@ -253,11 +256,13 @@ pub fn search_bible_cli(bible: &[Verse], synonym_mapper: &SynonymMapper, query: 
     }
 }
 
+// Cross-reference finder - find similar verses
 pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, reference: &str, similarity_threshold: f32, use_synonyms: bool, limit: Option<usize>, use_color: bool) {
     lazy_static! {
         static ref LOOKUP_RE: Regex = Regex::new(r"^(?P<book>.+?)\s(?P<chapter>\d+):(?P<verse>\d+)$").unwrap();
     }
 
+    // Parse the reference
     let (book, chapter, verse_num) = if let Some(caps) = LOOKUP_RE.captures(reference.trim()) {
         let book = caps["book"].to_string();
         let chapter: u32 = caps["chapter"].parse().unwrap();
@@ -268,6 +273,7 @@ pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, re
         return;
     };
 
+    // Find the source verse
     let source_verse = bible.iter().find(|v| {
         v.book.eq_ignore_ascii_case(&book) && v.chapter == chapter && v.verse == verse_num
     });
@@ -280,6 +286,7 @@ pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, re
         }
     };
 
+    // Display source verse
     if use_color {
         println!("{}", "Source Verse:".bright_green().bold());
     } else {
@@ -287,6 +294,7 @@ pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, re
     }
     println!("{}\n", source_verse);
 
+    // Extract words from source verse
     let source_words = extract_words(&source_verse.text, synonym_mapper, use_synonyms);
     
     if source_words.is_empty() {
@@ -294,8 +302,10 @@ pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, re
         return;
     }
 
+    // Calculate similarity for all other verses
     let mut similarities: Vec<(f32, &Verse)> = bible.iter()
         .filter(|v| {
+            // Exclude the source verse itself
             !(v.book.eq_ignore_ascii_case(&source_verse.book) 
               && v.chapter == source_verse.chapter 
               && v.verse == source_verse.verse)
@@ -308,8 +318,10 @@ pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, re
         .filter(|(sim, _)| *sim >= similarity_threshold)
         .collect();
 
+    // Sort by similarity (highest first)
     similarities.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
 
+    // Apply limit if specified
     if let Some(limit) = limit {
         similarities.truncate(limit);
     }
@@ -324,6 +336,7 @@ pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, re
         return;
     }
 
+    // Display results
     if use_color {
         println!("{}", format!("Found {} cross-reference(s) with similarity >= {:.1}%:", 
             similarities.len(), similarity_threshold * 100.0).green().bold());
@@ -355,7 +368,9 @@ pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, re
     }
 }
 
+// Extract significant words from text, optionally expanding with synonyms
 fn extract_words(text: &str, synonym_mapper: &SynonymMapper, use_synonyms: bool) -> Vec<String> {
+    // Common words to exclude (stop words)
     let stop_words: std::collections::HashSet<&str> = [
         "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from",
         "has", "he", "in", "is", "it", "its", "of", "on", "that", "the", "to",
@@ -394,6 +409,7 @@ fn extract_words(text: &str, synonym_mapper: &SynonymMapper, use_synonyms: bool)
     }
 }
 
+// Calculate Jaccard similarity between two word sets
 fn calculate_similarity(words1: &[String], words2: &[String]) -> f32 {
     if words1.is_empty() || words2.is_empty() {
         return 0.0;
@@ -409,5 +425,40 @@ fn calculate_similarity(words1: &[String], words2: &[String]) -> f32 {
         0.0
     } else {
         intersection as f32 / union as f32
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_synonym_expansion() {
+        let mut mapper = SynonymMapper::new();
+        mapper.synonyms.insert("god".to_string(), vec!["god".to_string(), "lord".to_string()]);
+        mapper.synonyms.insert("love".to_string(), vec!["love".to_string(), "beloved".to_string()]);
+        
+        let expanded = mapper.expand_query("god love");
+        
+        assert!(expanded.contains(&"god".to_string()));
+        assert!(expanded.contains(&"lord".to_string()));
+        assert!(expanded.contains(&"love".to_string()));
+        assert!(expanded.contains(&"beloved".to_string()));
+    }
+    
+    #[test]
+    fn test_verse_display() {
+        let verse = Verse {
+            book: "John".to_string(),
+            chapter: 3,
+            verse: 16,
+            text: "For God so loved the world...".to_string(),
+        };
+        
+        let display = format!("{}", verse);
+        assert!(display.contains("John"));
+        assert!(display.contains("3"));
+        assert!(display.contains("16"));
+        assert!(display.contains("For God so loved"));
     }
 }
