@@ -27,8 +27,43 @@ impl std::fmt::Display for Verse {
     }
 }
 
-// Synonym mapper for enhanced search
+// Similarity metric types
+enum SimilarityMetric {
+    Jaccard(f32),  // Threshold value
+    NGram(usize),  // N-gram size (2-gram, 3-gram, etc.)
+}
 
+// Parse similarity metric from string
+fn parse_similarity_metric(s: &str) -> SimilarityMetric {
+    let s = s.trim().to_lowercase();
+    
+    // Check for n-gram pattern
+    if s.ends_with("-gram") || s.ends_with("gram") {
+        let n_str = s.trim_end_matches("-gram").trim_end_matches("gram");
+        if let Ok(n) = n_str.parse::<usize>() {
+            if n > 0 {
+                return SimilarityMetric::NGram(n);
+            }
+        }
+    }
+    
+    // Otherwise treat as Jaccard threshold
+    match s.parse::<f32>() {
+        Ok(threshold) => SimilarityMetric::Jaccard(threshold.clamp(0.0, 1.0)),
+        Err(_) => {
+            eprintln!("Warning: Invalid similarity metric '{}', using default 0.3", s);
+            SimilarityMetric::Jaccard(0.3)
+        }
+    }
+}
+
+// Format metric description for display
+fn format_metric_description(metric: &SimilarityMetric) -> String {
+    match metric {
+        SimilarityMetric::Jaccard(threshold) => format!("similarity >= {:.1}%", threshold * 100.0),
+        SimilarityMetric::NGram(n) => format!("{}-gram phrase matching", n),
+    }
+}
 
 // Parses the bible.txt file and returns a Vector of Verse structs.
 pub fn load_bible(filename: &str) -> io::Result<Vec<Verse>> {
@@ -257,7 +292,8 @@ pub fn search_bible_cli(bible: &[Verse], synonym_mapper: &SynonymMapper, query: 
 }
 
 // Cross-reference finder - find similar verses
-pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, reference: &str, similarity_threshold: f32, use_synonyms: bool, limit: Option<usize>, use_color: bool) {
+// Note: signature changed to accept String instead of f32
+pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, reference: &str, similarity_str: &str, use_synonyms: bool, limit: Option<usize>, use_color: bool) {
     lazy_static! {
         static ref LOOKUP_RE: Regex = Regex::new(r"^(?P<book>.+?)\s(?P<chapter>\d+):(?P<verse>\d+)$").unwrap();
     }
@@ -294,6 +330,9 @@ pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, re
     }
     println!("{}\n", source_verse);
 
+    // Parse similarity metric
+    let similarity_metric = parse_similarity_metric(similarity_str);
+
     // Extract words from source verse
     let source_words = extract_words(&source_verse.text, synonym_mapper, use_synonyms);
     
@@ -310,12 +349,28 @@ pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, re
               && v.chapter == source_verse.chapter 
               && v.verse == source_verse.verse)
         })
-        .map(|v| {
+        .filter_map(|v| {
+            let similarity = match similarity_metric {
+                SimilarityMetric::Jaccard(threshold) => {
             let target_words = extract_words(&v.text, synonym_mapper, use_synonyms);
-            let similarity = calculate_similarity(&source_words, &target_words);
-            (similarity, v)
+                    let sim = calculate_jaccard_similarity(&source_words, &target_words);
+                    if sim >= threshold {
+                        Some(sim)
+                    } else {
+                        None
+                    }
+                }
+                SimilarityMetric::NGram(n) => {
+                    if has_ngram_match(&source_verse.text, &v.text, n, synonym_mapper, use_synonyms) {
+                        let score = count_ngram_matches(&source_verse.text, &v.text, n, synonym_mapper, use_synonyms);
+                        Some(score)
+                    } else {
+                        None
+                    }
+                }
+            };
+            similarity.map(|s| (s, v))
         })
-        .filter(|(sim, _)| *sim >= similarity_threshold)
         .collect();
 
     // Sort by similarity (highest first)
@@ -328,21 +383,20 @@ pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, re
 
     if similarities.is_empty() {
         if use_color {
-            println!("{}", format!("No cross-references found with similarity >= {:.1}%", similarity_threshold * 100.0).red());
+            println!("{}", format!("No cross-references found with {}", format_metric_description(&similarity_metric)).red());
         } else {
-            println!("No cross-references found with similarity >= {:.1}%", similarity_threshold * 100.0);
+            println!("No cross-references found with {}", format_metric_description(&similarity_metric));
         }
-        println!("Try lowering the --similarity threshold (default: 0.3)");
+        println!("Try adjusting the --similarity threshold or n-gram size");
         return;
     }
 
-    // Display results
     if use_color {
-        println!("{}", format!("Found {} cross-reference(s) with similarity >= {:.1}%:", 
-            similarities.len(), similarity_threshold * 100.0).green().bold());
+        println!("{}", format!("Found {} cross-reference(s) with {}:", 
+            similarities.len(), format_metric_description(&similarity_metric)).green().bold());
     } else {
-        println!("Found {} cross-reference(s) with similarity >= {:.1}%:", 
-            similarities.len(), similarity_threshold * 100.0);
+        println!("Found {} cross-reference(s) with {}:", 
+            similarities.len(), format_metric_description(&similarity_metric));
     }
     
     if use_synonyms {
@@ -351,14 +405,25 @@ pub fn find_cross_references(bible: &[Verse], synonym_mapper: &SynonymMapper, re
     println!();
 
     for (similarity, verse) in similarities {
-        let percentage = if use_color {
+        let score_display = match similarity_metric {
+            SimilarityMetric::Jaccard(_) => {
+                if use_color {
             format!("{:.1}%", similarity * 100.0).yellow().bold().to_string()
         } else {
             format!("{:.1}%", similarity * 100.0)
+                }
+            }
+            SimilarityMetric::NGram(_) => {
+                if use_color {
+                    format!("{:.0} match(es)", similarity).yellow().bold().to_string()
+                } else {
+                    format!("{:.0} match(es)", similarity)
+                }
+            }
         };
 
         println!("{} - {} {}:{} {}", 
-            percentage,
+            score_display,
             verse.book.cyan(),
             verse.chapter.to_string().cyan(),
             verse.verse.to_string().cyan(),
@@ -410,7 +475,7 @@ fn extract_words(text: &str, synonym_mapper: &SynonymMapper, use_synonyms: bool)
 }
 
 // Calculate Jaccard similarity between two word sets
-fn calculate_similarity(words1: &[String], words2: &[String]) -> f32 {
+fn calculate_jaccard_similarity(words1: &[String], words2: &[String]) -> f32 {
     if words1.is_empty() || words2.is_empty() {
         return 0.0;
     }
@@ -427,6 +492,83 @@ fn calculate_similarity(words1: &[String], words2: &[String]) -> f32 {
         intersection as f32 / union as f32
     }
 }
+
+// Extract n-grams from text
+fn extract_ngrams(text: &str, n: usize, synonym_mapper: &SynonymMapper, use_synonyms: bool) -> Vec<Vec<String>> {
+    let words = extract_words(text, synonym_mapper, false);
+    
+    if words.len() < n {
+        return vec![];
+    }
+    
+    let mut ngrams = Vec::new();
+    
+    for i in 0..=words.len() - n {
+        let ngram: Vec<String> = words[i..i+n].to_vec();
+        
+        if use_synonyms {
+            // Generate all synonym variations of this n-gram
+            let mut variations = vec![ngram.clone()];
+            
+            for (idx, word) in ngram.iter().enumerate() {
+                if let Some(synonyms) = synonym_mapper.synonyms.get(word) {
+                    let mut new_variations = Vec::new();
+                    for variation in &variations {
+                        for synonym in synonyms {
+                            let mut new_var = variation.clone();
+                            new_var[idx] = synonym.clone();
+                            new_variations.push(new_var);
+                        }
+                    }
+                    variations.extend(new_variations);
+                }
+            }
+            
+            ngrams.extend(variations);
+        } else {
+            ngrams.push(ngram);
+        }
+    }
+    
+    ngrams
+}
+
+// Check if two texts share at least one n-gram
+fn has_ngram_match(text1: &str, text2: &str, n: usize, synonym_mapper: &SynonymMapper, use_synonyms: bool) -> bool {
+    let ngrams1 = extract_ngrams(text1, n, synonym_mapper, use_synonyms);
+    let ngrams2 = extract_ngrams(text2, n, synonym_mapper, use_synonyms);
+    
+    let set2: std::collections::HashSet<_> = ngrams2.iter().collect();
+    
+    for ngram in &ngrams1 {
+        if set2.contains(ngram) {
+            return true;
+        }
+    }
+    
+    false
+}
+
+// Count number of matching n-grams
+fn count_ngram_matches(text1: &str, text2: &str, n: usize, synonym_mapper: &SynonymMapper, use_synonyms: bool) -> f32 {
+    let ngrams1 = extract_ngrams(text1, n, synonym_mapper, use_synonyms);
+    let ngrams2 = extract_ngrams(text2, n, synonym_mapper, use_synonyms);
+    
+    let set2: std::collections::HashSet<_> = ngrams2.iter().collect();
+    
+    let mut count = 0;
+    let mut counted = std::collections::HashSet::new();
+    
+    for ngram in &ngrams1 {
+        if set2.contains(ngram) && !counted.contains(ngram) {
+            count += 1;
+            counted.insert(ngram);
+    }
+    }
+    
+    count as f32
+}
+
 
 #[cfg(test)]
 mod tests {

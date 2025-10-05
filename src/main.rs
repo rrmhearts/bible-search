@@ -1,5 +1,3 @@
-// main.rs
-
 use colored::*;
 use clap::{Arg, Command};
 
@@ -12,7 +10,6 @@ use bible::{load_bible, search_bible_cli, lookup_verse_cli, get_random_verse, fi
 use synonyms::SynonymMapper;
 
 fn create_cli() -> Command {
-    // CLI creation code remains the same...
     Command::new("bible_tool")
         .version("2.0.1")
         .author("Your Name")
@@ -101,9 +98,8 @@ fn create_cli() -> Command {
             .conflicts_with_all(&["search", "random"]))
         .arg(Arg::new("similarity")
             .long("similarity")
-            .value_name("THRESHOLD")
-            .help("Similarity threshold for cross-references (0.0-1.0, default: 0.3)")
-            .value_parser(clap::value_parser!(f32))
+            .value_name("METRIC")
+            .help("Similarity metric: 0.0-1.0 for Jaccard, or '2-gram', '3-gram', etc. for phrase matching")
             .default_value("0.3"))
         .arg(Arg::new("use-synonyms-xref")
             .long("use-synonyms-xref")
@@ -111,7 +107,6 @@ fn create_cli() -> Command {
             .action(clap::ArgAction::SetTrue))
 }
 
-// Main function to run the application logic.
 fn main() {
     let matches = create_cli().get_matches();
     
@@ -132,7 +127,7 @@ fn main() {
         }
     }
     
-    // Shortened Bible selection text to version name --kjv or --erv
+    // Bible selection with version flags
     let bible_file = if matches.get_flag("kjv") {
         "bibles/kjv.txt"
     } else if matches.get_flag("erv") {
@@ -200,10 +195,10 @@ fn main() {
     } else if let Some(reference) = matches.get_one::<String>("reference") {
         lookup_verse_cli(&bible, reference);
     } else if let Some(reference) = matches.get_one::<String>("cross-references") {
-        let similarity_threshold = *matches.get_one::<f32>("similarity").unwrap();
+        let similarity_str = matches.get_one::<String>("similarity").unwrap();
         let use_synonyms = matches.get_flag("use-synonyms-xref");
         let limit = matches.get_one::<usize>("limit").copied();
         
-        find_cross_references(&bible, &synonym_mapper, reference, similarity_threshold, use_synonyms, limit, use_color);
+        find_cross_references(&bible, &synonym_mapper, reference, similarity_str, use_synonyms, limit, use_color);
     }
 }

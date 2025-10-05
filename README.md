@@ -60,16 +60,26 @@ This project is for searching and looking up verses with synonyms and other feat
 
 ### Cross-References
 ```bash
-# Find verses similar to John 3:16 (default 30% similarity threshold)
+# Find verses similar to John 3:16 (default 30% Jaccard similarity)
 ./bible_tool --cross-references "John 3:16"
 
 # Use synonyms for better matching
 ./bible_tool --cross-references "John 3:16" --use-synonyms-xref
 
-# Adjust similarity threshold (0.0 to 1.0)
+# Adjust Jaccard similarity threshold (0.0 to 1.0)
 ./bible_tool -x "Psalm 23:1" --similarity 0.4
 
+# Use n-gram phrase matching (finds verses with same 3-word phrases)
+./bible_tool -x "John 3:16" --similarity 3-gram
+
+# 2-gram matching (finds verses with same 2-word phrases)
+./bible_tool -x "Romans 8:28" --similarity 2-gram --use-synonyms-xref
+
+# 5-gram matching (finds verses with longer common phrases)
+./bible_tool -x "Genesis 1:1" --similarity 5-gram
+
 # Limit results
+./bible_tool -x "Romans 8:28" --similarity 3-gram -l 10
 ./bible_tool -x "Romans 8:28" --use-synonyms-xref --similarity 0.25 -l 10
 
 # Short form
@@ -96,8 +106,8 @@ This project is for searching and looking up verses with synonyms and other feat
 # Use custom synonyms file
 ./bible_tool --synonyms-file /path/to/my_synonyms.txt -s "god" --synonyms
 
-# Find cross-references with synonym matching
-./bible_tool -x "John 3:16" --use-synonyms-xref --similarity 0.35 -l 5
+# Find cross-references with synonym matching and n-gram
+./bible_tool -x "John 3:16" --similarity 3-gram --use-synonyms-xref -l 5
 
 # Disable colors for scripting
 ./bible_tool --search "hope" --no-color
@@ -200,6 +210,56 @@ Found 5 cross-reference(s) with similarity >= 30.0%:
 32.1% - 1 John 4:10 Herein is love, not that we loved God, but that he loved us, and sent his Son to be the propitiation for our sins.
 
 30.4% - Ephesians 2:4 But God, being rich in mercy, for his great love wherewith he loved us.
+
+```
+
+### N-Gram Cross-References
+```bash
+$ ./bible_tool -x "John 3:16" --similarity 3-gram --use-synonyms-xref -l 5
+
+Loading Bible from bibles/bible.txt...
+✅ Bible loaded successfully (31102 verses).
+✅ Loaded 18 synonym groups from synonyms.txt
+Source Verse:
+John 3:16 For God so loved the world, that he gave his only begotten Son, that whosoever believeth on him should not perish, but have eternal life.
+
+Found 5 cross-reference(s) with 3-gram phrase matching:
+(Using synonym matching)
+
+3 match(es) - John 3:17 For God sent not the Son into the world to judge the world; but that the world should be saved through him.
+
+2 match(es) - 1 John 4:9 Herein was the love of God manifested in us, that God hath sent his only begotten Son into the world, that we might live through him.
+
+2 match(es) - Romans 6:23 For the wages of sin is death; but the free gift of God is eternal life in Christ Jesus our Lord.
+
+1 match(es) - John 1:12 But as many as received him, to them gave he the right to become children of God, even to them that believe on his name.
+
+1 match(es) - 1 John 5:11 And the witness is this, that God gave unto us eternal life, and this life is in his Son.
+
+```
+
+### N-Gram Cross-References
+```bash
+$ ./bible_tool -x "John 3:16" --similarity 3-gram --use-synonyms-xref -l 5
+
+Loading Bible from bible.txt...
+✅ Bible loaded successfully (31102 verses).
+✅ Loaded 18 synonym groups from synonyms.txt
+Source Verse:
+John 3:16 For God so loved the world, that he gave his only begotten Son, that whosoever believeth on him should not perish, but have eternal life.
+
+Found 5 cross-reference(s) with 3-gram phrase matching:
+(Using synonym matching)
+
+3 match(es) - John 3:17 For God sent not the Son into the world to judge the world; but that the world should be saved through him.
+
+2 match(es) - 1 John 4:9 Herein was the love of God manifested in us, that God hath sent his only begotten Son into the world, that we might live through him.
+
+2 match(es) - Romans 6:23 For the wages of sin is death; but the free gift of God is eternal life in Christ Jesus our Lord.
+
+1 match(es) - John 1:12 But as many as received him, to them gave he the right to become children of God, even to them that believe on his name.
+
+1 match(es) - 1 John 5:11 And the witness is this, that God gave unto us eternal life, and this life is in his Son.
 
 ```
 
@@ -350,7 +410,7 @@ Genesis 1:2	And the earth was waste and void; and darkness was upon the face of 
 | `--search` | `-s` | Search for text in verses |
 | `--reference` | `-r` | Look up verse by reference |
 | `--cross-references` | `-x` | Find cross-references for a verse |
-| `--similarity` |  | Similarity threshold for cross-references (0.0-1.0, default: 0.3) |
+| `--similarity` |  | Similarity metric: 0.0-1.0 for Jaccard, or '2-gram', '3-gram', etc. for phrase matching (default: 0.3) |
 | `--use-synonyms-xref` |  | Use synonyms when calculating cross-reference similarity |
 | `--random` |  | Get a random verse |
 | `--synonyms` |  | Include synonyms in search |
@@ -427,13 +487,54 @@ chmod +x search_bible.sh
 ### Cross-Reference Study
 
 ```bash
-# Find related verses for study
+# Find related verses for study using Jaccard similarity
 ./bible_tool -x "Romans 8:28" --use-synonyms-xref --similarity 0.3 -l 10 > related_verses.txt
 
-# Compare cross-references with different thresholds
-./bible_tool -x "John 3:16" --similarity 0.5 -l 5  # Very similar only
-./bible_tool -x "John 3:16" --similarity 0.2 -l 20 # Broader matches
+# Find verses with exact phrase matches (3-gram)
+./bible_tool -x "John 3:16" --similarity 3-gram -l 10
+
+# Compare different similarity methods
+./bible_tool -x "John 3:16" --similarity 0.5 -l 5     # Jaccard: Very similar content
+./bible_tool -x "John 3:16" --similarity 3-gram -l 5  # N-gram: Common 3-word phrases
+./bible_tool -x "John 3:16" --similarity 2-gram -l 20 # N-gram: Broader phrase matches
 ```
+
+## Understanding Similarity Metrics
+
+### Jaccard Similarity (Default)
+Measures word overlap between verses:
+- **0.3 (30%)** = Default, finds moderately related verses
+- **0.5 (50%)** = High similarity, very related themes
+- **0.2 (20%)** = Lower threshold, broader matches
+- **1.0 (100%)** = Exact word match (unlikely to find any)
+
+**Example:**
+```bash
+./bible_tool -x "John 3:16" --similarity 0.4
+```
+
+### N-Gram Phrase Matching
+Finds verses containing the same consecutive word sequences:
+- **2-gram**: Matches any 2-word phrase (e.g., "love God", "eternal life")
+- **3-gram**: Matches any 3-word phrase (e.g., "God so loved")
+- **4-gram**: Matches any 4-word phrase (more specific)
+- **5-gram or higher**: Matches longer phrases (very specific)
+
+**Example:**
+```bash
+# Find verses with common 3-word phrases
+./bible_tool -x "John 3:16" --similarity 3-gram
+
+# With synonyms: "God" and "Lord" count as matching
+./bible_tool -x "John 3:16" --similarity 3-gram --use-synonyms-xref
+```
+
+**When to use which:**
+- **Jaccard**: Finding thematically similar verses (same topics/concepts)
+- **N-gram**: Finding verses with similar wording or quotations
+- **2-gram**: Broad phrase matching, many results
+- **3-gram**: Balanced phrase matching (recommended)
+- **4-gram+**: Specific phrase matching, fewer results
 
 ## Troubleshooting
 
@@ -505,6 +606,7 @@ crontab -e
 ✅ **Default synonym creation** - Quick start with `--create-synonyms`  
 ✅ **Custom synonym files** - Use `--synonyms-file` for different configurations  
 ✅ **Cross-reference finder** - Find similar verses with adjustable similarity threshold  
+✅ **Multiple similarity metrics** - Jaccard (word overlap) or N-gram (phrase matching)  
 ✅ **Synonym-based similarity** - Use `--use-synonyms-xref` for semantic matching  
 ✅ **Graceful fallback** - Works without synonym file (exact matching only)  
 ✅ **Comment support** - Document your synonym choices with `#` comments  

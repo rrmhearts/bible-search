@@ -1,5 +1,3 @@
-// synonyms.rs
-
 use std::fs::{self, File};
 use std::io::{self, BufRead};
 use std::collections::HashMap;
