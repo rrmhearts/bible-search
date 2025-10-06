@@ -1,20 +1,18 @@
-// main.rs
-
 use colored::*;
 use clap::{Arg, Command};
 
 // Declare the new modules
 mod bible;
 mod synonyms;
+mod json_parser;
 
 // Use the structs and functions from the new modules
-use bible::{load_bible, search_bible_cli, lookup_verse_cli, get_random_verse, find_cross_references, interactive_mode};
+use bible::{search_bible_cli, lookup_verse_cli, get_random_verse, find_cross_references, interactive_mode};
 use synonyms::SynonymMapper;
 
 fn create_cli() -> Command {
-    // CLI creation code remains the same...
     Command::new("bible_tool")
-        .version("2.0.1")
+        .version("2.0.2")
         .author("Your Name")
         .about("Enhanced Bible search tool with synonym support")
         .arg(Arg::new("file")
@@ -27,17 +25,27 @@ fn create_cli() -> Command {
             .long("kjv")
             .help("Use the King James Version (bibles/kjv.txt)")
             .action(clap::ArgAction::SetTrue)
-            .conflicts_with_all(&["file", "erv", "asv"]))
+            .conflicts_with_all(&["file", "erv", "asv", "esv", "nasb"]))
         .arg(Arg::new("erv")
             .long("erv")
             .help("Use the English Revised Version (bibles/erv.txt)")
             .action(clap::ArgAction::SetTrue)
-            .conflicts_with_all(&["file", "kjv", "asv"]))
+            .conflicts_with_all(&["file", "kjv", "asv", "esv", "nasb"]))
+        .arg(Arg::new("esv")
+            .long("esv")
+            .help("Use the English Revised Version (bibles/ESV.json)")
+            .action(clap::ArgAction::SetTrue)
+            .conflicts_with_all(&["file", "kjv", "asv", "erv", "nasb"]))
+        .arg(Arg::new("nasb")
+            .long("nasb")
+            .help("Use the English Revised Version (bibles/NASB.json)")
+            .action(clap::ArgAction::SetTrue)
+            .conflicts_with_all(&["file", "kjv", "asv", "erv", "esv"]))
         .arg(Arg::new("asv")
             .long("asv")
             .help("Use the American Standard Version (bibles/asv.txt)")
             .action(clap::ArgAction::SetTrue)
-            .conflicts_with_all(&["file", "kjv", "erv"]))
+            .conflicts_with_all(&["file", "kjv", "erv", "esv", "nasb"]))
         .arg(Arg::new("synonyms-file")
             .long("synonyms-file")
             .value_name("FILE")
@@ -101,9 +109,8 @@ fn create_cli() -> Command {
             .conflicts_with_all(&["search", "random"]))
         .arg(Arg::new("similarity")
             .long("similarity")
-            .value_name("THRESHOLD")
-            .help("Similarity threshold for cross-references (0.0-1.0, default: 0.3)")
-            .value_parser(clap::value_parser!(f32))
+            .value_name("METRIC")
+            .help("Similarity metric: 0.0-1.0 for Jaccard, or '2-gram', '3-gram', etc. for phrase matching")
             .default_value("0.3"))
         .arg(Arg::new("use-synonyms-xref")
             .long("use-synonyms-xref")
@@ -111,7 +118,6 @@ fn create_cli() -> Command {
             .action(clap::ArgAction::SetTrue))
 }
 
-// Main function to run the application logic.
 fn main() {
     let matches = create_cli().get_matches();
     
@@ -132,13 +138,17 @@ fn main() {
         }
     }
     
-    // Shortened Bible selection text to version name --kjv or --erv
+    // Bible selection with version flags
     let bible_file = if matches.get_flag("kjv") {
         "bibles/kjv.txt"
     } else if matches.get_flag("erv") {
         "bibles/erv.txt"
     } else if matches.get_flag("asv") {
         "bibles/asv.txt"
+    } else if matches.get_flag("esv") {
+        "bibles/ESV.json"
+    } else if matches.get_flag("nasb") {
+        "bibles/NASB.json"
     } else {
         // Fallback to the --file argument if no version flag is used
         matches.get_one::<String>("file").unwrap()
@@ -149,7 +159,7 @@ fn main() {
     println!("Loading Bible from {}...", bible_file);
     
     // Load all verses from the file into memory.
-    let bible = match load_bible(bible_file) {
+    let bible = match json_parser::load_bible_auto(bible_file) {
         Ok(verses) => {
             println!("✅ Bible loaded successfully ({} verses).", verses.len());
             verses
@@ -157,6 +167,7 @@ fn main() {
         Err(e) => {
             eprintln!("🔥 Error loading {}: {}", bible_file, e);
             eprintln!("Please ensure the file exists and has the correct format.");
+            eprintln!("Supported formats: TAB-delimited text (.txt) or JSON (.json)");
             return;
         }
     };
@@ -200,10 +211,10 @@ fn main() {
     } else if let Some(reference) = matches.get_one::<String>("reference") {
         lookup_verse_cli(&bible, reference);
     } else if let Some(reference) = matches.get_one::<String>("cross-references") {
-        let similarity_threshold = *matches.get_one::<f32>("similarity").unwrap();
+        let similarity_str = matches.get_one::<String>("similarity").unwrap();
         let use_synonyms = matches.get_flag("use-synonyms-xref");
         let limit = matches.get_one::<usize>("limit").copied();
         
-        find_cross_references(&bible, &synonym_mapper, reference, similarity_threshold, use_synonyms, limit, use_color);
+        find_cross_references(&bible, &synonym_mapper, reference, similarity_str, use_synonyms, limit, use_color);
     }
 }
