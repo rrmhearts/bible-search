@@ -1,6 +1,6 @@
 [package]
 name = "bible_tool"
-version = "2.0.1"
+version = "2.0.2"
 edition = "2021"
 authors = ["Ryan McCoppin <rrmhearts@gmail.com>"]
 description = "Enhanced Bible search tool with synonym support and command line interface"
@@ -8,8 +8,10 @@ description = "Enhanced Bible search tool with synonym support and command line 
 [dependencies]
 clap = { version = "4.4", features = ["derive"] }
 regex = "1.10"
-lazy_static = "1.4.0"
-colored = "2"
+colored = "2.0"
+lazy_static = "1.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [dev-dependencies]
 tempfile = "3.8"

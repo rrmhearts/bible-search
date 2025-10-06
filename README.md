@@ -384,7 +384,9 @@ sanctification: sanctification, holiness, sanctified, holy, set apart
 
 ## File Format
 
-Your Bible file should follow this format:
+Your Bible file can be in one of two formats:
+
+### Text Format (Tab-delimited)
 ```
 ERV
 English Revised Version
@@ -396,6 +398,29 @@ Genesis 1:2	And the earth was waste and void; and darkness was upon the face of 
 - Line 1: Translation abbreviation
 - Line 2: Full translation name  
 - Line 3+: Reference[TAB]Text format
+
+### JSON Format (BibleTranslations)
+Supports the format from [BibleTranslations repository](https://github.com/jadenzaleski/BibleTranslations):
+```json
+{
+  "Genesis": {
+    "1": {
+      "1": "In the beginning God created the heaven and the earth.",
+      "2": "And the earth was without form, and void..."
+    },
+    "2": {
+      "1": "Thus the heavens and the earth were finished."
+    }
+  },
+  "John": {
+    "3": {
+      "16": "For God so loved the world..."
+    }
+  }
+}
+```
+
+The tool automatically detects the format based on file extension (`.json`) or file content.
 
 ## Command Line Options
 
@@ -458,8 +483,9 @@ Create different synonym files for different translations:
 echo "charity: charity, love, agape" >> synonyms_kjv.txt
 echo "conversation: conversation, conduct, behavior, manner of life" >> synonyms_kjv.txt
 
-# Use with KJV Bible
-./bible_tool -f kjv_bible.txt --synonyms-file synonyms_kjv.txt -s "charity" --synonyms
+# Use with KJV Bible (text or JSON format)
+./bible_tool -f bibles/kjv.txt --synonyms-file synonyms_kjv.txt -s "charity" --synonyms
+./bible_tool -f bibles/KJV.json --synonyms-file synonyms_kjv.txt -s "charity" --synonyms
 ```
 
 ### Quick Scripture Finder Script
@@ -601,6 +627,8 @@ crontab -e
 
 ## Features
 
+✅ **Multiple Bible formats** - Supports both tab-delimited text and JSON formats  
+✅ **Auto-format detection** - Automatically detects file format  
 ✅ **External synonym configuration** - No recompilation needed to add/remove synonyms  
 ✅ **Simple text file format** - Easy to edit with any text editor  
 ✅ **Default synonym creation** - Quick start with `--create-synonyms`  
@@ -655,4 +683,3 @@ cargo build --release
 ## License
 
 MIT License
-
