@@ -1,6 +1,6 @@
 # Bible Search Tool
 
-This project is for searching and looking up verses with synonyms and other features that are not available in most public Bible search websites. The goal is progressive growth and practicing Rust language for terminal applications. Currently, this repository defaults to an English Revised Version (ERV) Bible because of its public access. It also supports KJV (`--kjv`) and ASV (`--asv`). Hope to extend functionality to more versions in the future.
+This project is for searching and looking up verses with synonyms and other features that are not available in most public Bible search websites. The goal is progressive growth and practicing Rust language for terminal applications. Currently, this repository defaults to an English Revised Version (ERV) Bible because of its public access. It also supports ESV (`--esv`), NASB (`--nasb`), KJV (`--kjv`) and ASV (`--asv`). Hope to extend functionality to more versions in the future.
 
 **Coffee is a proven love language.** If this has proven helpful to you,
 
