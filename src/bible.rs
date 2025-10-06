@@ -443,7 +443,7 @@ fn extract_words(text: &str, synonym_mapper: &SynonymMapper, use_synonyms: bool)
         "hath", "his", "her", "him", "them", "they", "their", "all", "not",
         "which", "there", "this", "these", "those", "when", "who", "what",
         "into", "upon", "out", "up", "have", "had", "do", "did", "done",
-        "said", "came", "went", "been", "were", "being"
+        "said", "came", "went", "been", "were", "being", "of"
     ].iter().cloned().collect();
 
     let words: Vec<String> = text
