@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use std::fs;
+use std::io::{self, Write};
 
 /// A struct to convert text into latent vectors and perform semantic search.
 pub struct SemanticSearcher {
@@ -13,8 +14,10 @@ impl SemanticSearcher {
     pub fn new() -> Result<Self> {
         // InitOptions allows us to specify the model. 
         // It will automatically download on the first run and cache it.
-        let model = TextEmbedding::try_new(InitOptions::new(EmbeddingModel::AllMiniLML6V2))
+        let model = TextEmbedding::try_new(InitOptions::new(EmbeddingModel::SnowflakeArcticEmbedXS))
             .context("Failed to initialize the embedding model")?;
+        // let model = TextEmbedding::try_new(InitOptions::new(EmbeddingModel::AllMiniLML6V2Q))
+        //     .context("Failed to initialize the embedding model")?;
 
         Ok(Self { model })
     }
@@ -112,12 +115,13 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     // Read the target document
-    let document_text = fs::read_to_string(&args.file)
+    println!("Loading document into memory...");
+    let document_text = std::fs::read_to_string(&args.file)
         .with_context(|| format!("Could not read file '{}'", args.file))?;
 
-    println!("Loading ONNX model and processing text...");
-    
-    // Execute search
+        println!("Loading ONNX model and processing text...");
+
+        // Execute search
     let mut searcher = SemanticSearcher::new()?;
     let matches = searcher.search(&args.query, &document_text, args.top_k, &args.separator)?;
 
@@ -127,6 +131,39 @@ fn main() -> Result<()> {
         println!("[{}] Similarity Score: {:.4}", i + 1, score);
         println!("{}\n", text);
         println!("{}\n", "-".repeat(40));
+    }
+    println!("Ready! Model and text are loaded.\n");
+
+    // 2. Keep the program alive with an infinite loop
+    loop {
+        // Prompt the user
+        print!("Enter search query (or type 'quit' to exit): ");
+        io::stdout().flush()?; // Ensure the prompt prints before waiting for input
+
+        let mut user_input = String::new();
+        io::stdin().read_line(&mut user_input)?;
+        let query = user_input.trim();
+
+        // Exit condition
+        if query.eq_ignore_ascii_case("quit") || query.eq_ignore_ascii_case("exit") {
+            println!("Exiting search...");
+            break;
+        }
+
+        if query.is_empty() {
+            continue;
+        }
+
+        // 3. Execute the search instantly (model is already in RAM)
+        let matches = searcher.search(query, &document_text, args.top_k, &args.separator)?;
+
+        // Display results
+        println!("\n--- Top {} Matches for: '{}' ---\n", args.top_k, query);
+        for (i, (score, text)) in matches.iter().enumerate() {
+            println!("[{}] Similarity Score: {:.4}", i + 1, score);
+            println!("{}\n", text);
+            println!("{}\n", "-".repeat(40));
+        }
     }
 
     Ok(())
