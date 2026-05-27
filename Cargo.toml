@@ -4,6 +4,7 @@ version = "2.0.2"
 edition = "2021"
 authors = ["Ryan McCoppin <rrmhearts@gmail.com>"]
 description = "Enhanced Bible search tool with synonym support and command line interface"
+repository = "https://github.com/rrmhearts/bible_tool"
 
 [dependencies]
 clap = { version = "4.4", features = ["derive"] }
@@ -19,3 +20,8 @@ tempfile = "3.8"
 [[bin]]
 name = "bible_tool"
 path = "src/main.rs"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
